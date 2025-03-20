@@ -30,11 +30,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buEqual: Button
     private lateinit var buClear: Button
 
-    private var decidot = 1
-    private var op = "none"
-    private var oldNumber = "0"
-    private var newOp = true
-    private var finalNumber: Double? = 0.0
+    private var currentInput = "0"
+    private var currentOperation: String? = null
+    private var lastNumber: Double = 0.0
+    private var shouldResetInput = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,8 +57,8 @@ class MainActivity : AppCompatActivity() {
         budiv = findViewById(R.id.budiv)
         buplus = findViewById(R.id.buplus)
         buminus = findViewById(R.id.buminus)
-        buEqual = findViewById(R.id.buEqual)
-        buClear = findViewById(R.id.buClear)
+        buEqual = findViewById(R.id.buequal)
+        buClear = findViewById(R.id.buclear)
 
         // Disable editing on the EditText
         etnumber.isEnabled = false
@@ -67,97 +66,102 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun NumberEvent(view: View) {
-        try {
-            if (newOp) {
-                etnumber.setText("")
-                decidot = 1
+        val digit = (view as Button).text.toString()
+        
+        if (shouldResetInput) {
+            currentInput = digit
+            shouldResetInput = false
+        } else {
+            if (currentInput == "0" && digit != ".") {
+                currentInput = digit
+            } else if (digit == "." && !currentInput.contains(".")) {
+                currentInput += digit
+            } else if (digit != ".") {
+                currentInput += digit
             }
-            newOp = false
-            val buSelect = view as Button
-            var buClickValue: String = etnumber.text.toString()
-
-            when (buSelect.id) {
-                bu0.id -> buClickValue += "0"
-                bu1.id -> buClickValue += "1"
-                bu2.id -> buClickValue += "2"
-                bu3.id -> buClickValue += "3"
-                bu4.id -> buClickValue += "4"
-                bu5.id -> buClickValue += "5"
-                bu6.id -> buClickValue += "6"
-                bu7.id -> buClickValue += "7"
-                bu8.id -> buClickValue += "8"
-                bu9.id -> buClickValue += "9"
-                budot.id -> {
-                    if (decidot == 1) {
-                        buClickValue = if (buClickValue == "") "0." else "$buClickValue."
-                        decidot = 0
-                    }
-                }
-            }
-            etnumber.setText(buClickValue)
-            finalNumber = buClickValue.toDouble()
-
-            // Update history
-            tvHistory.text = tvHistory.text.toString() + buSelect.text
-        } catch (ex: Exception) {
-            Toast.makeText(this, ex.message, Toast.LENGTH_LONG).show()
         }
+        updateDisplay()
     }
 
     fun OpEvent(view: View) {
-        val buSelect = view as Button
-        when (buSelect.id) {
-            bumul.id -> op = "*"
-            budiv.id -> op = "/"
-            buplus.id -> op = "+"
-            buminus.id -> op = "-"
+        val newOp = when ((view as Button).id) {
+            R.id.bumul -> "*"
+            R.id.budiv -> "/"
+            R.id.buplus -> "+"
+            R.id.buminus -> "-"
+            else -> return
         }
-        oldNumber = etnumber.text.toString()
-        newOp = true
-        decidot = 1
 
-        // Update history
-        tvHistory.text = tvHistory.text.toString() + " " + buSelect.text + " "
+        if (!shouldResetInput) {
+            if (currentOperation != null) {
+                calculate()
+            }
+            lastNumber = currentInput.toDouble()
+        }
+        currentOperation = newOp
+        shouldResetInput = true
+    }
+
+    private fun calculate() {
+        if (currentOperation == null) return
+        
+        val current = currentInput.toDouble()
+        val result = when (currentOperation) {
+            "+" -> lastNumber + current
+            "-" -> lastNumber - current
+            "*" -> lastNumber * current
+            "/" -> if (current != 0.0) lastNumber / current else {
+                Toast.makeText(this, "Cannot divide by zero", Toast.LENGTH_SHORT).show()
+                return
+            }
+            else -> return
+        }
+        
+        currentInput = formatResult(result)
+        updateDisplay()
     }
 
     fun buEqual(view: View) {
-        try {
-            if (etnumber.text.toString().isEmpty() || etnumber.text.toString() == ".") {
-                etnumber.setText("0.0")
-            }
+        calculate()
+        currentOperation = null
+        shouldResetInput = true
+    }
 
-            val newNumber = etnumber.text.toString()
-
-            finalNumber = when (op) {
-                "*" -> oldNumber.toDouble() * newNumber.toDouble()
-                "/" -> oldNumber.toDouble() / newNumber.toDouble()
-                "+" -> oldNumber.toDouble() + newNumber.toDouble()
-                "-" -> oldNumber.toDouble() - newNumber.toDouble()
-                else -> newNumber.toDouble()
-            }
-
-            // Display the full calculation inside the input field
-            etnumber.setText(finalNumber.toString())
-
-            // Reset values for next calculation
-            oldNumber = finalNumber.toString()
-            op = "none"
-            decidot = 1
-            newOp = true
-
-        } catch (ex: Exception) {
-            Toast.makeText(this, "Error: ${ex.message}", Toast.LENGTH_LONG).show()
+    private fun formatResult(number: Double): String {
+        return if (number % 1 == 0.0) {
+            number.toLong().toString()
+        } else {
+            "%.8f".format(number).trimEnd('0').trimEnd('.')
         }
     }
 
+    private fun updateDisplay() {
+        etnumber.setText(currentInput)
+    }
 
     fun buclear(view: View) {
-        etnumber.setText("")
-        oldNumber = "0"
-        finalNumber = 0.0
-        op = "none"
-        decidot = 1
-        newOp = true
+        currentInput = "0"
+        currentOperation = null
+        lastNumber = 0.0
+        shouldResetInput = false
+        updateDisplay()
+    }
+
+    fun signChange(view: View) {
+        if (currentInput != "0") {
+            currentInput = if (currentInput.startsWith("-")) {
+                currentInput.substring(1)
+            } else {
+                "-$currentInput"
+            }
+            updateDisplay()
+        }
+    }
+
+    fun bupercent(view: View) {
+        val value = currentInput.toDouble() / 100
+        currentInput = formatResult(value)
+        updateDisplay()
     }
 
 }
